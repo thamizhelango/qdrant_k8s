@@ -1,0 +1,87 @@
+# Prometheus Stack - Observability Configuration
+# Includes: Prometheus, Grafana, AlertManager
+
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    # Scrape interval
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    # Resource limits
+    resources:
+      requests:
+        memory: 400Mi
+        cpu: 200m
+      limits:
+        memory: 1Gi
+        cpu: 500m
+    # Storage
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+  # Enable service for external access
+  service:
+    type: NodePort
+    nodePort: 30090
+
+grafana:
+  enabled: true
+  adminPassword: "admin123"  # Change in production!
+  
+  service:
+    type: NodePort
+    nodePort: 30080
+  
+  # Pre-configured dashboards
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+
+  # Qdrant dashboard
+  dashboardsConfigMaps:
+    default: "qdrant-grafana-dashboard"
+
+  # Data sources - using default from chart
+  # datasources configured by kube-prometheus-stack automatically
+
+alertmanager:
+  enabled: true
+  service:
+    type: NodePort
+    nodePort: 30093
+
+# Node exporter for system metrics
+nodeExporter:
+  enabled: true
+
+# Kube state metrics
+kubeStateMetrics:
+  enabled: true
+
+# Disable some components for lightweight setup
+kubeApiServer:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+

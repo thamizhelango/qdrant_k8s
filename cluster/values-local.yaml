@@ -1,0 +1,90 @@
+# Qdrant Helm Chart - Local Development Configuration
+# Optimized for Kind cluster with limited resources
+
+replicaCount: 1
+
+image:
+  repository: docker.io/qdrant/qdrant
+  pullPolicy: IfNotPresent
+  tag: "v1.12.4"  # Must be valid semver for chart's semverCompare
+  useUnprivilegedImage: false
+
+# Service configuration - NodePort for external access
+service:
+  type: NodePort
+  ports:
+    - name: http
+      port: 6333
+      targetPort: 6333
+      nodePort: 30333
+      protocol: TCP
+      checksEnabled: true
+    - name: grpc
+      port: 6334
+      targetPort: 6334
+      nodePort: 30334
+      protocol: TCP
+      checksEnabled: false
+    - name: p2p
+      port: 6335
+      targetPort: 6335
+      protocol: TCP
+      checksEnabled: false
+
+# Reduced resources for local development
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "250m"
+  limits:
+    memory: "1Gi"
+    cpu: "500m"
+
+# Persistence configuration
+persistence:
+  accessModes: ["ReadWriteOnce"]
+  size: 10Gi
+  # storageClassName: "standard"  # Kind uses default StorageClass
+
+# Qdrant configuration
+config:
+  cluster:
+    enabled: true  # Enable cluster mode
+    p2p:
+      port: 6335
+      enable_tls: false
+    consensus:
+      tick_period_ms: 100
+  storage:
+    performance:
+      memmap_threshold_kb: 10240
+      indexing_threshold_kb: 5000
+  service:
+    grpc_port: 6334
+    enable_tls: false
+
+# Disable PDB for single replica (not useful with 1 pod)
+podDisruptionBudget:
+  enabled: false
+
+# Monitoring - ServiceMonitor disabled (requires Prometheus Operator CRDs)
+metrics:
+  serviceMonitor:
+    enabled: false
+
+# Probes
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 1
+  failureThreshold: 6
+  successThreshold: 1

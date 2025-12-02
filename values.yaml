@@ -1,0 +1,131 @@
+# Qdrant Helm Chart - Production Configuration
+# GitHub: https://github.com/qdrant/qdrant-helm
+
+replicaCount: 3
+
+image:
+  repository: docker.io/qdrant/qdrant
+  pullPolicy: IfNotPresent
+  tag: "v1.12.4"  # Must be valid semver for chart's semverCompare
+  useUnprivilegedImage: false
+
+# Service configuration
+service:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 6333
+      targetPort: 6333
+      protocol: TCP
+      checksEnabled: true
+    - name: grpc
+      port: 6334
+      targetPort: 6334
+      protocol: TCP
+      checksEnabled: false
+    - name: p2p
+      port: 6335
+      targetPort: 6335
+      protocol: TCP
+      checksEnabled: false
+
+# Ingress configuration (optional)
+ingress:
+  enabled: false
+  ingressClassName: "nginx"
+  annotations:
+    kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: qdrant.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          servicePort: 6333
+  tls:
+    - secretName: qdrant-tls
+      hosts:
+        - qdrant.example.com
+
+# Resource limits for production
+resources:
+  requests:
+    memory: "4Gi"
+    cpu: "2"
+  limits:
+    memory: "8Gi"
+    cpu: "4"
+
+# Persistence configuration
+persistence:
+  accessModes: ["ReadWriteOnce"]
+  size: 100Gi
+  # storageClassName: "standard"  # Uncomment and set your storage class
+
+# Qdrant configuration
+config:
+  cluster:
+    enabled: true
+    p2p:
+      port: 6335
+      enable_tls: false
+    consensus:
+      tick_period_ms: 100
+  storage:
+    performance:
+      memmap_threshold_kb: 20480
+      indexing_threshold_kb: 10000
+  service:
+    grpc_port: 6334
+    enable_tls: false
+
+# Pod disruption budget for high availability
+# NOTE: Only set ONE of minAvailable or maxUnavailable, not both
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+  # minAvailable: 2  # Don't use both - chart defaults to maxUnavailable
+
+# Anti-affinity for spreading pods across nodes
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - qdrant
+          topologyKey: kubernetes.io/hostname
+
+# Monitoring with Prometheus
+# NOTE: ServiceMonitor requires Prometheus Operator CRDs to be installed first
+metrics:
+  serviceMonitor:
+    enabled: false  # Set to true only after Prometheus Operator is installed
+    scrapeInterval: 30s
+    scrapeTimeout: 10s
+    targetPort: http
+    targetPath: "/metrics"
+
+# Liveness and readiness probes
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 1
+  failureThreshold: 6
+  successThreshold: 1
+
+# API Key authentication (recommended for production)
+# Set via --set apiKey=<your-key> or use external secret
+# apiKey: false
